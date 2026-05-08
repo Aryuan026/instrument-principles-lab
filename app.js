@@ -54,6 +54,8 @@ const state = {
   flow: "focus",
   sample: "city",
   image: null,
+  uploadLook: "faithful",
+  channelsTouched: false,
   activeUploadId: null,
   uploadCache: [],
   threshold: 30,
@@ -125,6 +127,8 @@ function fitCanvasToViewport() {
 function setActiveSample(sample) {
   state.sample = sample;
   state.image = null;
+  state.uploadLook = "faithful";
+  state.channelsTouched = false;
   state.activeUploadId = null;
   document.querySelectorAll(".sample-button").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.sample === sample);
@@ -160,12 +164,8 @@ function setUploadedImage(src, name, cacheId = null) {
   img.addEventListener("load", () => {
     state.image = img;
     state.sample = "upload";
-    state.channels = {
-      blue: true,
-      green: true,
-      red: true,
-      magenta: true,
-    };
+    state.uploadLook = "pending";
+    state.channelsTouched = false;
     state.activeUploadId = cacheId || addUploadCache(src, name);
     document.querySelectorAll(".sample-button").forEach((button) => button.classList.remove("is-active"));
     syncChannelButtons();
@@ -181,6 +181,28 @@ function syncChannelButtons() {
     const channel = button.dataset.channel;
     button.classList.toggle("is-on", Boolean(state.channels[channel]));
   });
+}
+
+function applyUploadLook(look) {
+  if (!state.image) {
+    return;
+  }
+
+  const previousLook = state.uploadLook;
+  const changed = previousLook !== look;
+  state.uploadLook = look;
+  if (!state.channelsTouched && (changed || previousLook === "pending")) {
+    state.channels = look === "neon"
+      ? { blue: true, green: true, red: false, magenta: true }
+      : { blue: true, green: true, red: true, magenta: false };
+    syncChannelButtons();
+  }
+
+  const item = state.uploadCache.find((entry) => entry.id === state.activeUploadId);
+  if (item && (item.status.startsWith("已上传") || item.status.startsWith("已识别"))) {
+    item.status = look === "neon" ? "已识别：霓虹线稿" : "已识别：结构伪彩";
+    renderUploadCache();
+  }
 }
 
 function renderUploadCache() {
@@ -366,7 +388,55 @@ function drawSource() {
   }
 
   state.sourceData = sourceCtx.getImageData(0, 0, width, height);
+  if (state.image) {
+    applyUploadLook(analyzeUploadedLook(state.sourceData, width, height));
+  }
   scheduleRender();
+}
+
+function analyzeUploadedLook(imageData, width, height) {
+  const data = imageData.data;
+  const step = Math.max(5, Math.floor(Math.sqrt((width * height) / 9000)));
+  let count = 0;
+  let edgeCount = 0;
+  let skyLike = 0;
+  let neutralLike = 0;
+  let stainLike = 0;
+
+  for (let y = 0; y < height - step; y += step) {
+    for (let x = 0; x < width - step; x += step) {
+      const i = (y * width + x) * 4;
+      const right = (y * width + Math.min(width - 1, x + step)) * 4;
+      const down = (Math.min(height - 1, y + step) * width + x) * 4;
+      const r = data[i] / 255;
+      const g = data[i + 1] / 255;
+      const b = data[i + 2] / 255;
+      const lum = (r * 0.2126 + g * 0.7152 + b * 0.0722);
+      const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+      const edge = Math.abs(r - data[right] / 255) + Math.abs(g - data[right + 1] / 255) + Math.abs(b - data[right + 2] / 255) +
+        Math.abs(r - data[down] / 255) + Math.abs(g - data[down + 1] / 255) + Math.abs(b - data[down + 2] / 255);
+
+      count += 1;
+      if (edge > 0.18) {
+        edgeCount += 1;
+      }
+      if (lum > 0.52 && b > r + 0.06 && b > g - 0.02 && edge < 0.18) {
+        skyLike += 1;
+      }
+      if (chroma < 0.14 && lum > 0.18 && lum < 0.84) {
+        neutralLike += 1;
+      }
+      if (r > 0.42 && b > 0.34 && g < r * 0.92 && chroma > 0.08 && lum > 0.26) {
+        stainLike += 1;
+      }
+    }
+  }
+
+  const edgeRatio = edgeCount / Math.max(1, count);
+  const skyRatio = skyLike / Math.max(1, count);
+  const neutralRatio = neutralLike / Math.max(1, count);
+  const stainRatio = stainLike / Math.max(1, count);
+  return skyRatio > 0.08 || (edgeRatio > 0.18 && neutralRatio > 0.32 && stainRatio < 0.18) ? "neon" : "faithful";
 }
 
 function drawUploadedImage(width, height) {
@@ -984,6 +1054,7 @@ function render() {
   const darken = state.background;
   const blackFloor = darken * 0.52;
   const colorMix = state.mode === "merge" || state.mode === "pseudo" ? state.colorMix : 0;
+  const neonLook = state.image && state.uploadLook === "neon";
 
   if (state.mode === "brightfield") {
     renderBrightfieldFrame(source, width, height);
@@ -1034,11 +1105,15 @@ function render() {
       const coolChroma = state.image ? smoothstep(0.04, 0.3, srcB - Math.max(srcR, srcG) * 0.86) : 0;
       const skyWash = state.image ? smoothstep(0.55, 0.9, lum) * coolChroma * (1 - smoothstep(0.08, 0.22, edge)) : 0;
       const edgeSignal = state.image ? Math.max(edge, colorEdge * 0.86) : edge;
+      const lineStart = neonLook ? Math.max(0.06, threshold * 0.28) : Math.max(0.02, threshold * 0.16);
+      const lineEnd = neonLook ? 0.38 : 0.2;
+      const haloStart = neonLook ? Math.max(0.035, threshold * 0.18) : Math.max(0.01, threshold * 0.08);
+      const haloEnd = neonLook ? 0.42 : 0.34;
       const lineCore = state.image
-        ? Math.pow(smoothstep(Math.max(0.02, threshold * 0.16), 0.2, edgeSignal), 0.58)
+        ? Math.pow(smoothstep(lineStart, lineEnd, edgeSignal), neonLook ? 0.74 : 0.58)
         : edge;
       const lineHalo = state.image
-        ? Math.pow(smoothstep(Math.max(0.01, threshold * 0.08), 0.34, edgeSignal), 1.24) * 0.42
+        ? Math.pow(smoothstep(haloStart, haloEnd, edgeSignal), neonLook ? 1.8 : 1.24) * (neonLook ? 0.28 : 0.42)
         : 0;
       const high = Math.pow(smoothstep(Math.max(threshold, blackFloor * 0.72), 1, lum), 1.18) * intensity;
       const sparkle = ((x * 37 + y * 17 + ((x * y) % 53)) % 97) / 97;
@@ -1046,10 +1121,12 @@ function render() {
 
       if (state.mode === "gray") {
         const gate = state.image
-          ? lineCore * 1.06 + lineHalo + smoothstep(Math.max(threshold, blackFloor), 1, lum) * 0.06
+          ? neonLook
+            ? lineCore * 1.08 + lineHalo + smoothstep(Math.max(threshold, blackFloor), 1, lum) * 0.04
+            : lineCore * 0.44 + colorEdge * 0.18 + smoothstep(Math.max(threshold * 0.72, blackFloor), 1, lum) * 0.64
           : 0.18 + smoothstep(Math.max(threshold, blackFloor), 1, lum) * 1.04;
         const value = state.image
-          ? clamp(gate * 255 * (1 - darken * 0.16), 0, 255)
+          ? clamp(gate * 255 * (1 - darken * (neonLook ? 0.16 : 0.24)), 0, 255)
           : clamp((lum * gate + edge * 0.1) * 255 * (1 - darken * 0.32), 0, 255);
         const signalTone = smoothstep(0.04, 0.92, value / 255);
         target[i] = clamp(value * (0.82 + signalTone * 0.04), 0, 255);
@@ -1065,17 +1142,23 @@ function render() {
       const uploadedHot = state.image ? Math.pow(smoothstep(Math.max(threshold * 0.78, blackFloor * 0.68), 1, lum), 0.72) : high;
       const uploadedMid = state.image ? smoothstep(0.2, 0.76, lum) * (1 - smoothstep(0.78, 1, lum) * 0.38) : lum;
       const uploadedTexture = state.image ? clamp(uploadedFine * (0.62 + uploadedMid * 0.42), 0, 1) : edge;
+      const uploadedHighlight = state.image
+        ? clamp(uploadedHot * (0.34 + uploadedFine * 0.42 + sparkle * 0.12), 0, 1.38)
+        : high;
       const uploadedLine = state.image
-        ? clamp((lineCore * 1.12 + lineHalo * 0.68) * (0.7 + uploadedMid * 0.18), 0, 1.35)
+        ? neonLook
+          ? clamp((Math.pow(lineCore, 1.12) * 1.02 + lineHalo * 0.46) * (0.68 + uploadedMid * 0.1), 0, 1.22)
+          : clamp(uploadedTexture * 0.58 + lineCore * 0.28 + uploadedHighlight * 0.08, 0, 1.2)
         : edge;
       const uploadedShadowEdge = state.image
         ? clamp(uploadedDarkRim * (0.28 + coolChroma * 0.28) * (1 - warmChroma * 0.62) * (1 - skyWash * 0.72), 0, 1)
         : uploadedDarkRim;
-      const uploadedHighlight = state.image
-        ? clamp(uploadedHot * (0.34 + uploadedFine * 0.42 + sparkle * 0.12), 0, 1.38)
-        : high;
       const uploadedOffsetFloor = state.image ? blackFloor * 0.48 : blackFloor;
-      const baseLevel = state.image ? lineHalo * 10 + lum * (2.2 - darken * 1.8) : lum * (78 - darken * 58);
+      const baseLevel = state.image
+        ? neonLook
+          ? lineHalo * 5.5 + lum * (1.35 - darken * 1.18)
+          : lum * (4.6 - darken * 3.4) + lineHalo * 5
+        : lum * (78 - darken * 58);
       let r = baseLevel;
       let g = baseLevel;
       let b = baseLevel;
@@ -1093,9 +1176,9 @@ function render() {
           : (high + edge * 0.24) * smoothstep(blackFloor, 1, lum + edge * 0.2);
         const signal = clamp(pseudoInput * reveal * colorMix, 0, 1.8);
         if (state.image) {
-          const cyanSignal = clamp((uploadedLine * 0.72 + greenChroma * 0.28 + uploadedMid * 0.06) * reveal * colorMix * intensity, 0, 1.76);
-          const pinkSignal = clamp((uploadedLine * 0.56 + uploadedHighlight * 0.18 + warmChroma * 0.38) * reveal * colorMix * intensity, 0, 1.58);
-          const blueSignal = clamp((uploadedLine * 0.32 + uploadedShadowEdge * 0.08 + coolChroma * uploadedTexture * 0.06) * reveal * colorMix * intensity, 0, 1.04);
+          const cyanSignal = clamp((uploadedLine * (neonLook ? 0.98 : 0.42) + lineHalo * (neonLook ? 0.18 : 0) + greenChroma * (neonLook ? 0.12 : 0.34) + uploadedMid * 0.04) * reveal * colorMix * intensity, 0, neonLook ? 2.05 : 1.24);
+          const pinkSignal = clamp((uploadedLine * (neonLook ? 0.08 : 0.18) + uploadedHighlight * (neonLook ? 0.03 : 0.34) + warmChroma * (neonLook ? colorEdge * 0.28 : 0.44)) * reveal * colorMix * intensity, 0, neonLook ? 0.46 : 1.18);
+          const blueSignal = clamp((uploadedLine * (neonLook ? 0.72 : 0.16) + uploadedShadowEdge * (neonLook ? 0.04 : 0.08) + coolChroma * uploadedTexture * (neonLook ? 0.1 : 0.06)) * reveal * colorMix * intensity, 0, neonLook ? 1.55 : 0.78);
           r += 20 * cyanSignal + 245 * pinkSignal + 20 * blueSignal;
           g += 244 * cyanSignal + 42 * pinkSignal + 48 * blueSignal;
           b += 162 * cyanSignal + 238 * pinkSignal + 255 * blueSignal;
@@ -1107,36 +1190,44 @@ function render() {
       } else {
         if (state.channels.blue) {
           const blueInput = state.image
-            ? uploadedLine * 0.64 + uploadedShadowEdge * 0.04 + coolChroma * lineCore * 0.08
+            ? neonLook
+              ? uploadedLine * 0.68 + uploadedShadowEdge * 0.03 + coolChroma * colorEdge * 0.12
+              : uploadedLine * 0.22 + uploadedShadowEdge * 0.32 + uploadedBright * 0.05
             : Math.pow(srcB, 1.08);
-          const signal = clamp(channelSignal(blueInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? 1.24 : 1.2);
+          const signal = clamp(channelSignal(blueInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? (neonLook ? 1.4 : 0.92) : 1.2);
           r += channelColors.blue[0] * signal;
           g += channelColors.blue[1] * signal;
           b += channelColors.blue[2] * signal;
         }
         if (state.channels.green) {
           const greenInput = state.image
-            ? uploadedLine * 0.42 + greenChroma * lineCore * 0.42
+            ? neonLook
+              ? uploadedLine * 0.82 + greenChroma * colorEdge * 0.2
+              : uploadedLine * 0.28 + greenChroma * 0.4 + uploadedMid * 0.06
             : Math.pow(srcG, 1.02);
-          const signal = clamp(channelSignal(greenInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? 1.08 : 1.28);
+          const signal = clamp(channelSignal(greenInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? (neonLook ? 1.6 : 1.02) : 1.28);
           r += channelColors.green[0] * signal;
           g += channelColors.green[1] * signal;
           b += channelColors.green[2] * signal;
         }
         if (state.channels.red) {
           const redInput = state.image
-            ? uploadedLine * 0.08 + uploadedHighlight * 0.12 + warmChroma * lineCore * 0.5
+            ? neonLook
+              ? uploadedHighlight * 0.025 + warmChroma * colorEdge * 0.22
+              : uploadedLine * 0.16 + uploadedHighlight * 0.24 + warmChroma * 0.5
             : Math.pow(srcR, 1.04);
-          const signal = clamp(channelSignal(redInput, 0.98, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? 0.96 : 1.28);
+          const signal = clamp(channelSignal(redInput, 0.98, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? (neonLook ? 0.28 : 1.18) : 1.28);
           r += channelColors.red[0] * signal;
           g += channelColors.red[1] * signal;
           b += channelColors.red[2] * signal;
         }
         if (state.channels.magenta) {
           const magentaInput = state.image
-            ? uploadedLine * 0.72 + uploadedHighlight * 0.08 + warmChroma * lineCore * 0.24 + chroma * lineCore * 0.06
+            ? neonLook
+              ? uploadedHighlight * warmChroma * 0.06 + warmChroma * colorEdge * 0.42 + chroma * colorEdge * 0.05
+              : uploadedLine * 0.2 + uploadedHighlight * 0.16 + warmChroma * 0.3 + chroma * uploadedTexture * 0.06
             : Math.max(srcR * 0.55, srcB * 0.38);
-          const signal = clamp(channelSignal(magentaInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? 1.62 : 1.2);
+          const signal = clamp(channelSignal(magentaInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? (neonLook ? 0.48 : 1.02) : 1.2);
           r += channelColors.magenta[0] * signal;
           g += channelColors.magenta[1] * signal;
           b += channelColors.magenta[2] * signal;
@@ -1371,6 +1462,7 @@ function bindEvents() {
   document.querySelectorAll(".channel-button").forEach((button) => {
     button.addEventListener("click", () => {
       const channel = button.dataset.channel;
+      state.channelsTouched = true;
       state.channels[channel] = !state.channels[channel];
       syncChannelButtons();
       if (state.mode === "pseudo") {
