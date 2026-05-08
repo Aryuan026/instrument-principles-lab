@@ -523,15 +523,6 @@ input[type="range"]:focus-visible {
   background: rgba(16, 42, 32, 0.76);
 }
 
-.scope-guide .flow-button.is-confirming {
-  border-color: rgba(255, 226, 130, 0.68);
-  background: rgba(56, 40, 12, 0.82);
-}
-
-.scope-guide .flow-button.is-confirming strong {
-  color: #ffe282;
-}
-
 .scope-guide strong {
   display: block;
   color: var(--green);
