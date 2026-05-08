@@ -160,13 +160,27 @@ function setUploadedImage(src, name, cacheId = null) {
   img.addEventListener("load", () => {
     state.image = img;
     state.sample = "upload";
+    state.channels = {
+      blue: true,
+      green: true,
+      red: true,
+      magenta: true,
+    };
     state.activeUploadId = cacheId || addUploadCache(src, name);
     document.querySelectorAll(".sample-button").forEach((button) => button.classList.remove("is-active"));
+    syncChannelButtons();
     renderUploadCache();
     drawSource();
     enterFocusStage();
   });
   img.src = src;
+}
+
+function syncChannelButtons() {
+  document.querySelectorAll(".channel-button").forEach((button) => {
+    const channel = button.dataset.channel;
+    button.classList.toggle("is-on", Boolean(state.channels[channel]));
+  });
 }
 
 function renderUploadCache() {
@@ -1068,9 +1082,9 @@ function render() {
           : (high + edge * 0.24) * smoothstep(blackFloor, 1, lum + edge * 0.2);
         const signal = clamp(pseudoInput * reveal * colorMix, 0, 1.8);
         if (state.image) {
-          const cyanSignal = clamp((uploadedLine * 0.62 + greenChroma * 0.34 + uploadedMid * 0.08) * reveal * colorMix * intensity, 0, 1.58);
-          const pinkSignal = clamp((uploadedLine * 0.42 + uploadedHighlight * 0.38 + warmChroma * 0.46) * reveal * colorMix * intensity, 0, 1.7);
-          const blueSignal = clamp((uploadedLine * 0.2 + uploadedShadowEdge * 0.16 + coolChroma * uploadedTexture * 0.08) * reveal * colorMix * intensity, 0, 0.72);
+          const cyanSignal = clamp((uploadedLine * 0.72 + greenChroma * 0.28 + uploadedMid * 0.06) * reveal * colorMix * intensity, 0, 1.76);
+          const pinkSignal = clamp((uploadedLine * 0.56 + uploadedHighlight * 0.18 + warmChroma * 0.38) * reveal * colorMix * intensity, 0, 1.58);
+          const blueSignal = clamp((uploadedLine * 0.32 + uploadedShadowEdge * 0.08 + coolChroma * uploadedTexture * 0.06) * reveal * colorMix * intensity, 0, 1.04);
           r += 20 * cyanSignal + 245 * pinkSignal + 20 * blueSignal;
           g += 244 * cyanSignal + 42 * pinkSignal + 48 * blueSignal;
           b += 162 * cyanSignal + 238 * pinkSignal + 255 * blueSignal;
@@ -1082,36 +1096,36 @@ function render() {
       } else {
         if (state.channels.blue) {
           const blueInput = state.image
-            ? uploadedLine * 0.28 + uploadedShadowEdge * 0.16 + coolChroma * uploadedTexture * 0.12
+            ? uploadedLine * 0.5 + uploadedShadowEdge * 0.08 + coolChroma * uploadedTexture * 0.08
             : Math.pow(srcB, 1.08);
-          const signal = clamp(channelSignal(blueInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? 0.86 : 1.2);
+          const signal = clamp(channelSignal(blueInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? 1.24 : 1.2);
           r += channelColors.blue[0] * signal;
           g += channelColors.blue[1] * signal;
           b += channelColors.blue[2] * signal;
         }
         if (state.channels.green) {
           const greenInput = state.image
-            ? uploadedLine * 0.42 + greenChroma * 0.35 + uploadedMid * 0.05
+            ? uploadedLine * 0.38 + greenChroma * 0.38 + uploadedMid * 0.04
             : Math.pow(srcG, 1.02);
-          const signal = clamp(channelSignal(greenInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? 1.18 : 1.28);
+          const signal = clamp(channelSignal(greenInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? 1.08 : 1.28);
           r += channelColors.green[0] * signal;
           g += channelColors.green[1] * signal;
           b += channelColors.green[2] * signal;
         }
         if (state.channels.red) {
           const redInput = state.image
-            ? uploadedLine * 0.28 + uploadedHighlight * 0.38 + warmChroma * 0.58 + uploadedHot * 0.04
+            ? uploadedLine * 0.16 + uploadedHighlight * 0.22 + warmChroma * 0.42 + uploadedHot * 0.02
             : Math.pow(srcR, 1.04);
-          const signal = clamp(channelSignal(redInput, 0.92, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? 1.82 : 1.28);
+          const signal = clamp(channelSignal(redInput, 0.94, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? 1.24 : 1.28);
           r += channelColors.red[0] * signal;
           g += channelColors.red[1] * signal;
           b += channelColors.red[2] * signal;
         }
         if (state.channels.magenta) {
           const magentaInput = state.image
-            ? uploadedLine * 0.36 + uploadedHighlight * 0.32 + warmChroma * 0.42 + chroma * uploadedTexture * 0.08
+            ? uploadedLine * 0.58 + uploadedHighlight * 0.18 + warmChroma * 0.34 + chroma * uploadedTexture * 0.06
             : Math.max(srcR * 0.55, srcB * 0.38);
-          const signal = clamp(channelSignal(magentaInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? 1.76 : 1.2);
+          const signal = clamp(channelSignal(magentaInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? 1.62 : 1.2);
           r += channelColors.magenta[0] * signal;
           g += channelColors.magenta[1] * signal;
           b += channelColors.magenta[2] * signal;
@@ -1347,7 +1361,7 @@ function bindEvents() {
     button.addEventListener("click", () => {
       const channel = button.dataset.channel;
       state.channels[channel] = !state.channels[channel];
-      button.classList.toggle("is-on", state.channels[channel]);
+      syncChannelButtons();
       if (state.mode === "pseudo") {
         setMode("merge");
       }
