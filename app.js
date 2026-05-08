@@ -79,6 +79,7 @@ const state = {
   colorMix: 1,
   colorAnimation: null,
   cacheNeedsPreview: false,
+  downloadLabelTimer: null,
   renderPending: false,
 };
 
@@ -102,7 +103,9 @@ function randomFrom(seed) {
 
 function fitCanvasToViewport() {
   const rect = viewport.getBoundingClientRect();
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const compactViewport = window.matchMedia("(max-width: 720px)").matches;
+  const dprLimit = compactViewport ? 1 : 1.5;
+  const dpr = Math.min(window.devicePixelRatio || 1, dprLimit);
   const width = Math.max(360, Math.round(rect.width * dpr));
   const height = Math.max(320, Math.round(rect.height * dpr));
 
@@ -221,6 +224,108 @@ function cacheCurrentProcessedFrame(status = "已显影，可切回") {
   item.status = status;
   state.cacheNeedsPreview = false;
   renderUploadCache();
+}
+
+function dataUrlToBlob(dataUrl) {
+  const [header, payload] = dataUrl.split(",");
+  const mimeMatch = header.match(/^data:(.*?);base64$/);
+  if (!payload || !mimeMatch) {
+    return null;
+  }
+
+  const binary = atob(payload);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new Blob([bytes], { type: mimeMatch[1] });
+}
+
+function isMobileLikeBrowser() {
+  return /Android|iPhone|iPad|iPod|Mobile|MicroMessenger/i.test(navigator.userAgent);
+}
+
+function flashDownloadState(label) {
+  const original = downloadButton.dataset.defaultLabel || downloadButton.textContent;
+  downloadButton.dataset.defaultLabel = original;
+  downloadButton.textContent = label;
+  window.clearTimeout(state.downloadLabelTimer);
+  state.downloadLabelTimer = window.setTimeout(() => {
+    downloadButton.textContent = original;
+  }, 1500);
+}
+
+function openExportPreview(dataUrl, fileName) {
+  const previewWindow = window.open("", "_blank");
+  if (!previewWindow) {
+    window.location.href = dataUrl;
+    return;
+  }
+
+  previewWindow.document.write(`<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>荧光图像导出预览</title>
+    <style>
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #04100c; color: #e7f3ea; font: 16px/1.6 system-ui, sans-serif; }
+      main { width: min(100% - 28px, 720px); padding: 24px 0; }
+      h1 { margin: 0 0 8px; font-size: 1.3rem; }
+      p { margin: 0 0 16px; color: rgba(231, 243, 234, 0.72); }
+      img { width: 100%; border-radius: 10px; border: 1px solid rgba(118, 255, 164, 0.32); background: #000; }
+      a { display: inline-flex; margin-top: 16px; padding: 12px 18px; border-radius: 8px; background: #76ffa4; color: #06100b; font-weight: 800; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>荧光图像导出预览</h1>
+      <p>手机浏览器如果没有自动保存，可以长按图片保存；桌面端也可以点击按钮下载 PNG。</p>
+      <img src="${dataUrl}" alt="导出的荧光显影图像" />
+      <a href="${dataUrl}" download="${fileName}">下载 PNG</a>
+    </main>
+  </body>
+</html>`);
+  previewWindow.document.close();
+}
+
+async function exportCanvasImage() {
+  cacheCurrentProcessedFrame("已导出前预览");
+  const fileName = `fluorescence-signal-${Date.now()}.png`;
+  const dataUrl = canvas.toDataURL("image/png");
+  const blob = dataUrlToBlob(dataUrl);
+
+  if (isMobileLikeBrowser() && blob && navigator.share && typeof File !== "undefined") {
+    const file = new File([blob], fileName, { type: "image/png" });
+    const shareData = { files: [file], title: "荧光信号显影图" };
+    if (!navigator.canShare || navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData);
+        flashDownloadState("已发送分享");
+        return;
+      } catch (error) {
+        if (error?.name === "AbortError") {
+          flashDownloadState("已取消分享");
+          return;
+        }
+      }
+    }
+  }
+
+  if (!isMobileLikeBrowser() && "download" in HTMLAnchorElement.prototype) {
+    const link = document.createElement("a");
+    link.download = fileName;
+    link.href = dataUrl;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    flashDownloadState("已导出 PNG");
+    return;
+  }
+
+  openExportPreview(dataUrl, fileName);
+  flashDownloadState("长按保存");
 }
 
 function drawSource() {
@@ -1223,11 +1328,7 @@ function bindEvents() {
   resetButton.addEventListener("click", () => enterFocusStage());
 
   downloadButton.addEventListener("click", () => {
-    cacheCurrentProcessedFrame("已导出前预览");
-    const link = document.createElement("a");
-    link.download = `fluorescence-signal-${Date.now()}.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
+    void exportCanvasImage();
   });
 
   canvas.addEventListener("pointerdown", (event) => {

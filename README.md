@@ -12,6 +12,7 @@
 - 模拟采集、点扫描、伪彩叠加三个触屏友好的操作入口。
 - Threshold、Gain、PSF、Offset 四组参数，用科普语言解释信号筛选、探测放大、点扩散和黑场扣除。
 - DAPI、FITC、TRITC、Cy5 四个荧光通道，标注常见激发光与发射光关系。
+- 示例入口缩略图使用本地小图，来源与授权记录在 `docs/IMAGE_CREDITS.md`。
 
 ## 本地预览
 
@@ -37,8 +38,10 @@ python3 -m http.server 8765
 index.html                 页面结构与科普文案
 styles.css                 仪器面板视觉、响应式布局、触屏控件
 app.js                     图像生成、扫描动画、参数与通道逻辑
+assets/                    示例入口的本地缩略图资源
 docs/ITERATION_NOTES.md    这次迭代里确认过的体验原则与坑点
 docs/FIELD_TEST_CHECKLIST.md 明天现场刷新与试玩的记录表
+docs/IMAGE_CREDITS.md      外部图片来源与授权记录
 ```
 
 ## 验证记录
@@ -46,4 +49,4 @@ docs/FIELD_TEST_CHECKLIST.md 明天现场刷新与试玩的记录表
 - `node --check app.js`
 - 桌面宽屏、平板横屏、平板竖屏、手机窄屏截图检查
 - 浏览器控制台错误检查
-
+- 移动端导出采用系统分享/预览页兜底，避免 `a.download` 被拦截后无反馈
