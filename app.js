@@ -80,6 +80,8 @@ const state = {
   colorAnimation: null,
   cacheNeedsPreview: false,
   downloadLabelTimer: null,
+  pendingFlowConfirm: null,
+  flowConfirmTimer: null,
   renderPending: false,
 };
 
@@ -729,11 +731,62 @@ function resetMask(withSeed) {
 }
 
 function setActiveFlow(flow) {
+  clearPendingFlowConfirm();
   state.flow = flow;
   flowButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.flow === flow);
   });
   updateReadouts();
+}
+
+function isCompactTouchViewport() {
+  return window.matchMedia("(max-width: 720px)").matches && (navigator.maxTouchPoints > 0 || "ontouchstart" in window);
+}
+
+function clearPendingFlowConfirm() {
+  const pending = state.pendingFlowConfirm;
+  if (pending?.button) {
+    const label = pending.button.querySelector("strong");
+    pending.button.classList.remove("is-confirming");
+    if (label && pending.button.dataset.defaultLabel) {
+      label.textContent = pending.button.dataset.defaultLabel;
+    }
+  }
+  window.clearTimeout(state.flowConfirmTimer);
+  state.pendingFlowConfirm = null;
+  state.flowConfirmTimer = null;
+}
+
+function shouldConfirmFlow(button, flow) {
+  if (!isCompactTouchViewport() || flow !== "raster") {
+    return false;
+  }
+
+  return Boolean(state.image || state.mode !== "brightfield" || state.flow !== "focus" || button.classList.contains("is-active"));
+}
+
+function confirmFlowOrHold(button, flow) {
+  if (!shouldConfirmFlow(button, flow)) {
+    return true;
+  }
+
+  const now = performance.now();
+  const pending = state.pendingFlowConfirm;
+  if (pending?.button === button && pending.flow === flow && now - pending.time < 1800) {
+    clearPendingFlowConfirm();
+    return true;
+  }
+
+  clearPendingFlowConfirm();
+  const label = button.querySelector("strong");
+  if (label) {
+    button.dataset.defaultLabel ||= label.textContent;
+    label.textContent = "再点扫描";
+  }
+  button.classList.add("is-confirming");
+  state.pendingFlowConfirm = { button, flow, time: now };
+  state.flowConfirmTimer = window.setTimeout(clearPendingFlowConfirm, 1800);
+  return false;
 }
 
 function enterFocusStage() {
@@ -1285,11 +1338,16 @@ function bindEvents() {
 
   flowButtons.forEach((button) => {
     button.addEventListener("click", () => {
-      if (button.dataset.flow === "acquire") {
+      const flow = button.dataset.flow;
+      if (!confirmFlowOrHold(button, flow)) {
+        return;
+      }
+
+      if (flow === "acquire") {
         enterAcquireStage();
-      } else if (button.dataset.flow === "raster") {
+      } else if (flow === "raster") {
         startRasterStage();
-      } else if (button.dataset.flow === "color") {
+      } else if (flow === "color") {
         startColorStage();
       }
     });
