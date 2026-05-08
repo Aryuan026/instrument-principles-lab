@@ -997,6 +997,13 @@ function render() {
       const right = grayMap[p + 1] ?? lum;
       const down = grayMap[p + width] ?? lum;
       const edge = clamp((Math.abs(lum - right) + Math.abs(lum - down)) * 4.8, 0, 1);
+      const maxChannel = Math.max(srcR, srcG, srcB);
+      const minChannel = Math.min(srcR, srcG, srcB);
+      const chroma = maxChannel - minChannel;
+      const warmChroma = state.image ? smoothstep(0.03, 0.28, srcR - Math.max(srcG, srcB) * 0.82) : 0;
+      const greenChroma = state.image ? smoothstep(0.02, 0.22, srcG - Math.max(srcR, srcB) * 0.9) : 0;
+      const coolChroma = state.image ? smoothstep(0.04, 0.3, srcB - Math.max(srcR, srcG) * 0.86) : 0;
+      const skyWash = state.image ? smoothstep(0.55, 0.9, lum) * coolChroma * (1 - smoothstep(0.08, 0.22, edge)) : 0;
       const high = Math.pow(smoothstep(Math.max(threshold, blackFloor * 0.72), 1, lum), 1.18) * intensity;
       const sparkle = ((x * 37 + y * 17 + ((x * y) % 53)) % 97) / 97;
       const reveal = state.fullReveal ? 1 : clamp(0.12 + (maskData[i + 3] / 255) * 0.96, 0.12, 1);
@@ -1018,6 +1025,9 @@ function render() {
       const uploadedHot = state.image ? Math.pow(smoothstep(Math.max(threshold * 0.78, blackFloor * 0.68), 1, lum), 0.72) : high;
       const uploadedMid = state.image ? smoothstep(0.2, 0.76, lum) * (1 - smoothstep(0.78, 1, lum) * 0.38) : lum;
       const uploadedTexture = state.image ? clamp(uploadedFine * (0.62 + uploadedMid * 0.42), 0, 1) : edge;
+      const uploadedShadowEdge = state.image
+        ? clamp(uploadedDarkRim * (0.28 + coolChroma * 0.28) * (1 - warmChroma * 0.62) * (1 - skyWash * 0.72), 0, 1)
+        : uploadedDarkRim;
       const uploadedHighlight = state.image
         ? clamp(uploadedHot * (0.34 + uploadedFine * 0.42 + sparkle * 0.12), 0, 1.38)
         : high;
@@ -1040,9 +1050,9 @@ function render() {
           : (high + edge * 0.24) * smoothstep(blackFloor, 1, lum + edge * 0.2);
         const signal = clamp(pseudoInput * reveal * colorMix, 0, 1.8);
         if (state.image) {
-          const cyanSignal = clamp((uploadedTexture * 0.7 + uploadedMid * 0.18) * reveal * colorMix * intensity, 0, 1.56);
-          const pinkSignal = clamp((uploadedHighlight * 0.82 + uploadedHot * 0.08) * reveal * colorMix * intensity, 0, 1.72);
-          const blueSignal = clamp((uploadedDarkRim * 0.72 + uploadedFine * 0.12) * reveal * colorMix * intensity, 0, 1.32);
+          const cyanSignal = clamp((uploadedTexture * 0.42 + greenChroma * 0.42 + uploadedMid * 0.1) * reveal * colorMix * intensity, 0, 1.28);
+          const pinkSignal = clamp((uploadedHighlight * 0.58 + warmChroma * 0.58 + uploadedHot * 0.08) * reveal * colorMix * intensity, 0, 1.86);
+          const blueSignal = clamp((uploadedShadowEdge * 0.34 + coolChroma * uploadedTexture * 0.18) * reveal * colorMix * intensity, 0, 0.82);
           r += 20 * cyanSignal + 245 * pinkSignal + 20 * blueSignal;
           g += 244 * cyanSignal + 42 * pinkSignal + 48 * blueSignal;
           b += 162 * cyanSignal + 238 * pinkSignal + 255 * blueSignal;
@@ -1054,29 +1064,35 @@ function render() {
       } else {
         if (state.channels.blue) {
           const blueInput = state.image
-            ? uploadedDarkRim * 0.46 + uploadedTexture * 0.18 + uploadedHighlight * 0.22
+            ? uploadedShadowEdge * 0.34 + coolChroma * uploadedTexture * 0.22 + uploadedFine * 0.04
             : Math.pow(srcB, 1.08);
-          const signal = clamp(channelSignal(blueInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? 1.5 : 1.2);
+          const signal = clamp(channelSignal(blueInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? 0.86 : 1.2);
           r += channelColors.blue[0] * signal;
           g += channelColors.blue[1] * signal;
           b += channelColors.blue[2] * signal;
         }
         if (state.channels.green) {
-          const greenInput = state.image ? uploadedTexture * 0.48 + uploadedMid * 0.16 + uploadedBright * 0.08 : Math.pow(srcG, 1.02);
-          const signal = clamp(channelSignal(greenInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? 1.18 : 1.28);
+          const greenInput = state.image
+            ? uploadedTexture * 0.32 + greenChroma * 0.42 + uploadedMid * 0.08 + uploadedBright * 0.05
+            : Math.pow(srcG, 1.02);
+          const signal = clamp(channelSignal(greenInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? 0.96 : 1.28);
           r += channelColors.green[0] * signal;
           g += channelColors.green[1] * signal;
           b += channelColors.green[2] * signal;
         }
         if (state.channels.red) {
-          const redInput = state.image ? uploadedHighlight * 0.74 + uploadedTexture * 0.18 + uploadedHot * 0.1 : Math.pow(srcR, 1.04);
+          const redInput = state.image
+            ? uploadedHighlight * 0.52 + warmChroma * 0.72 + uploadedTexture * 0.16 + uploadedHot * 0.06
+            : Math.pow(srcR, 1.04);
           const signal = clamp(channelSignal(redInput, 0.92, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? 1.82 : 1.28);
           r += channelColors.red[0] * signal;
           g += channelColors.red[1] * signal;
           b += channelColors.red[2] * signal;
         }
         if (state.channels.magenta) {
-          const magentaInput = state.image ? uploadedHighlight * 0.62 + uploadedTexture * 0.24 : Math.max(srcR * 0.55, srcB * 0.38);
+          const magentaInput = state.image
+            ? uploadedHighlight * 0.48 + warmChroma * 0.5 + chroma * uploadedTexture * 0.12
+            : Math.max(srcR * 0.55, srcB * 0.38);
           const signal = clamp(channelSignal(magentaInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? 1.76 : 1.2);
           r += channelColors.magenta[0] * signal;
           g += channelColors.magenta[1] * signal;
