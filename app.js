@@ -49,6 +49,13 @@ const channelColors = {
   magenta: [255, 101, 216],
 };
 
+const neonChannelColors = {
+  blue: [88, 96, 255],
+  green: [20, 245, 225],
+  red: [255, 158, 66],
+  magenta: [255, 80, 230],
+};
+
 const state = {
   mode: "brightfield",
   flow: "focus",
@@ -1113,10 +1120,10 @@ function render() {
       const coolChroma = state.image ? smoothstep(0.04, 0.3, srcB - Math.max(srcR, srcG) * 0.86) : 0;
       const skyWash = state.image ? smoothstep(0.55, 0.9, lum) * coolChroma * (1 - smoothstep(0.08, 0.22, edge)) : 0;
       const edgeSignal = state.image ? Math.max(edge, colorEdge * 0.86) : edge;
-      const lineStart = neonLook ? Math.max(0.06, threshold * 0.28) : Math.max(0.02, threshold * 0.16);
-      const lineEnd = neonLook ? 0.38 : 0.2;
-      const haloStart = neonLook ? Math.max(0.035, threshold * 0.18) : Math.max(0.01, threshold * 0.08);
-      const haloEnd = neonLook ? 0.42 : 0.34;
+      const lineStart = neonLook ? Math.max(0.08, threshold * 0.34) : Math.max(0.02, threshold * 0.16);
+      const lineEnd = neonLook ? 0.46 : 0.2;
+      const haloStart = neonLook ? Math.max(0.05, threshold * 0.22) : Math.max(0.01, threshold * 0.08);
+      const haloEnd = neonLook ? 0.52 : 0.34;
       const lineCore = state.image
         ? Math.pow(smoothstep(lineStart, lineEnd, edgeSignal), neonLook ? 0.74 : 0.58)
         : edge;
@@ -1153,9 +1160,10 @@ function render() {
       const uploadedHighlight = state.image
         ? clamp(uploadedHot * (0.34 + uploadedFine * 0.42 + sparkle * 0.12), 0, 1.38)
         : high;
+      const neonStructure = neonLook ? smoothstep(0.16, 0.62, edgeSignal) : 1;
       const uploadedLine = state.image
         ? neonLook
-          ? clamp((Math.pow(lineCore, 1.12) * 1.02 + lineHalo * 0.46) * (0.68 + uploadedMid * 0.1), 0, 1.22)
+          ? clamp((Math.pow(lineCore, 1.26) * 0.94 + lineHalo * 0.38) * (0.56 + uploadedMid * 0.08 + neonStructure * 0.28), 0, 1.12)
           : clamp(uploadedTexture * 0.58 + lineCore * 0.28 + uploadedHighlight * 0.08, 0, 1.2)
         : edge;
       const uploadedShadowEdge = state.image
@@ -1181,37 +1189,37 @@ function render() {
         const huePick = hashUnit(segmentIndex, strandIndex, 19);
         const strengthJitter = 0.82 + hashUnit(segmentIndex, strandIndex, 43) * 0.28;
 
-        if (huePick < 0.3) {
-          neonBlueWeight = 1.04;
-          neonGreenWeight = 0.26;
+        if (huePick < 0.34) {
+          neonBlueWeight = 1.02;
+          neonGreenWeight = 0.38;
           neonRedWeight = 0.03;
-          neonMagentaWeight = 0.18;
-        } else if (huePick < 0.58) {
-          neonBlueWeight = 0.18;
-          neonGreenWeight = 1.08;
+          neonMagentaWeight = 0.28;
+        } else if (huePick < 0.66) {
+          neonBlueWeight = 0.3;
+          neonGreenWeight = 1.06;
           neonRedWeight = 0.03;
-          neonMagentaWeight = 0.06;
-        } else if (huePick < 0.73) {
-          neonBlueWeight = 0.06;
-          neonGreenWeight = 0.12;
-          neonRedWeight = 0.84;
           neonMagentaWeight = 0.12;
-        } else if (huePick < 0.88) {
-          neonBlueWeight = 0.22;
-          neonGreenWeight = 0.06;
-          neonRedWeight = 0.1;
-          neonMagentaWeight = 0.94;
+        } else if (huePick < 0.79) {
+          neonBlueWeight = 0.08;
+          neonGreenWeight = 0.12;
+          neonRedWeight = 0.68;
+          neonMagentaWeight = 0.18;
+        } else if (huePick < 0.94) {
+          neonBlueWeight = 0.32;
+          neonGreenWeight = 0.1;
+          neonRedWeight = 0.06;
+          neonMagentaWeight = 1.0;
         } else {
-          neonBlueWeight = 0.64;
-          neonGreenWeight = 0.72;
+          neonBlueWeight = 0.68;
+          neonGreenWeight = 0.74;
           neonRedWeight = 0.03;
           neonMagentaWeight = 0.28;
         }
 
-        neonBlueWeight = clamp((neonBlueWeight + coolChroma * 0.14) * strengthJitter, 0, 1.24);
-        neonGreenWeight = clamp((neonGreenWeight + greenChroma * 0.16) * strengthJitter, 0, 1.24);
-        neonRedWeight = clamp((neonRedWeight + warmChroma * 0.22) * strengthJitter, 0, 1.18);
-        neonMagentaWeight = clamp((neonMagentaWeight + warmChroma * 0.16 + chroma * 0.04) * strengthJitter, 0, 1.18);
+        neonBlueWeight = clamp((neonBlueWeight + coolChroma * 0.1) * strengthJitter, 0, 1.18);
+        neonGreenWeight = clamp((neonGreenWeight + greenChroma * 0.1) * strengthJitter, 0, 1.18);
+        neonRedWeight = clamp((neonRedWeight + warmChroma * 0.14) * strengthJitter, 0, 0.86);
+        neonMagentaWeight = clamp((neonMagentaWeight + warmChroma * 0.1 + chroma * 0.025) * strengthJitter, 0, 1.08);
       }
       let r = baseLevel;
       let g = baseLevel;
@@ -1234,15 +1242,16 @@ function render() {
           const pinkSignal = clamp((uploadedLine * (neonLook ? neonMagentaWeight * 0.5 + neonRedWeight * 0.12 : 0.18) + uploadedHighlight * (neonLook ? 0.025 : 0.34) + warmChroma * (neonLook ? colorEdge * 0.22 : 0.44)) * reveal * colorMix * intensity, 0, neonLook ? 0.82 : 1.18);
           const blueSignal = clamp((uploadedLine * (neonLook ? 0.2 + neonBlueWeight * 0.68 + neonMagentaWeight * 0.1 : 0.16) + uploadedShadowEdge * (neonLook ? 0.04 : 0.08) + coolChroma * uploadedTexture * (neonLook ? 0.1 : 0.06)) * reveal * colorMix * intensity, 0, neonLook ? 1.55 : 0.78);
           const redSignal = clamp((uploadedLine * (neonLook ? neonRedWeight * 0.46 : 0) + warmChroma * colorEdge * (neonLook ? 0.16 : 0)) * reveal * colorMix * intensity, 0, neonLook ? 0.56 : 0);
-          r += 20 * cyanSignal + 245 * pinkSignal + 20 * blueSignal + 255 * redSignal;
-          g += 244 * cyanSignal + 42 * pinkSignal + 48 * blueSignal + 56 * redSignal;
-          b += 162 * cyanSignal + 238 * pinkSignal + 255 * blueSignal + 36 * redSignal;
+          r += 20 * cyanSignal + 255 * pinkSignal + 88 * blueSignal + 255 * redSignal;
+          g += 245 * cyanSignal + 80 * pinkSignal + 96 * blueSignal + 158 * redSignal;
+          b += 225 * cyanSignal + 230 * pinkSignal + 255 * blueSignal + 66 * redSignal;
         } else {
           r += channelColors.green[0] * signal;
           g += channelColors.green[1] * signal;
           b += channelColors.green[2] * signal;
         }
       } else {
+        const activeChannelColors = neonLook ? neonChannelColors : channelColors;
         if (state.channels.blue) {
           const blueInput = state.image
             ? neonLook
@@ -1250,9 +1259,9 @@ function render() {
               : uploadedLine * 0.22 + uploadedShadowEdge * 0.32 + uploadedBright * 0.05
             : Math.pow(srcB, 1.08);
           const signal = clamp(channelSignal(blueInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? (neonLook ? 1.4 : 0.92) : 1.2);
-          r += channelColors.blue[0] * signal;
-          g += channelColors.blue[1] * signal;
-          b += channelColors.blue[2] * signal;
+          r += activeChannelColors.blue[0] * signal;
+          g += activeChannelColors.blue[1] * signal;
+          b += activeChannelColors.blue[2] * signal;
         }
         if (state.channels.green) {
           const greenInput = state.image
@@ -1261,9 +1270,9 @@ function render() {
               : uploadedLine * 0.28 + greenChroma * 0.4 + uploadedMid * 0.06
             : Math.pow(srcG, 1.02);
           const signal = clamp(channelSignal(greenInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? (neonLook ? 1.6 : 1.02) : 1.28);
-          r += channelColors.green[0] * signal;
-          g += channelColors.green[1] * signal;
-          b += channelColors.green[2] * signal;
+          r += activeChannelColors.green[0] * signal;
+          g += activeChannelColors.green[1] * signal;
+          b += activeChannelColors.green[2] * signal;
         }
         if (state.channels.red) {
           const redInput = state.image
@@ -1272,9 +1281,9 @@ function render() {
               : uploadedLine * 0.16 + uploadedHighlight * 0.24 + warmChroma * 0.5
             : Math.pow(srcR, 1.04);
           const signal = clamp(channelSignal(redInput, 0.98, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? (neonLook ? 0.56 : 1.18) : 1.28);
-          r += channelColors.red[0] * signal;
-          g += channelColors.red[1] * signal;
-          b += channelColors.red[2] * signal;
+          r += activeChannelColors.red[0] * signal;
+          g += activeChannelColors.red[1] * signal;
+          b += activeChannelColors.red[2] * signal;
         }
         if (state.channels.magenta) {
           const magentaInput = state.image
@@ -1283,9 +1292,9 @@ function render() {
               : uploadedLine * 0.2 + uploadedHighlight * 0.16 + warmChroma * 0.3 + chroma * uploadedTexture * 0.06
             : Math.max(srcR * 0.55, srcB * 0.38);
           const signal = clamp(channelSignal(magentaInput, 1, uploadedOffsetFloor) * reveal * colorMix, 0, state.image ? (neonLook ? 0.62 : 1.02) : 1.2);
-          r += channelColors.magenta[0] * signal;
-          g += channelColors.magenta[1] * signal;
-          b += channelColors.magenta[2] * signal;
+          r += activeChannelColors.magenta[0] * signal;
+          g += activeChannelColors.magenta[1] * signal;
+          b += activeChannelColors.magenta[2] * signal;
         }
       }
 
@@ -1333,10 +1342,53 @@ function drawFinal(withGlow, now = performance.now()) {
   ctx.drawImage(signalCanvas, 0, 0);
   ctx.restore();
 
+  if (withGlow && state.image && state.uploadLook === "neon") {
+    drawNeonAtmosphere(now);
+  }
+
   if (withGlow) {
     drawSoftVignette();
   }
   drawActiveScanBeam(now);
+}
+
+function drawNeonAtmosphere(now) {
+  const width = canvas.width;
+  const height = canvas.height;
+  const lineGap = Math.max(7, Math.round(height * 0.012));
+  const drift = Math.floor((now / 120) % lineGap);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+
+  for (let y = -drift; y < height; y += lineGap) {
+    const pulse = 0.55 + hashUnit(Math.floor(y / lineGap), 17, 3) * 0.45;
+    ctx.fillStyle = `rgba(112, 238, 255, ${0.024 * pulse})`;
+    ctx.fillRect(0, y, width, 1);
+  }
+
+  const bandCount = 4;
+  for (let index = 0; index < bandCount; index += 1) {
+    const y = height * (0.18 + index * 0.2) + Math.sin(now / 1800 + index * 1.7) * height * 0.012;
+    const x0 = width * (0.08 + hashUnit(index, 9, 2) * 0.12);
+    const x1 = width * (0.78 + hashUnit(index, 12, 6) * 0.14);
+    const gradient = ctx.createLinearGradient(x0, y, x1, y);
+    gradient.addColorStop(0, "rgba(74, 109, 255, 0)");
+    gradient.addColorStop(0.22, "rgba(74, 109, 255, 0.055)");
+    gradient.addColorStop(0.62, "rgba(24, 245, 225, 0.075)");
+    gradient.addColorStop(1, "rgba(255, 80, 230, 0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x0, y, x1 - x0, Math.max(1, height * 0.0024));
+  }
+
+  const cornerGlow = ctx.createRadialGradient(width * 0.82, height * 0.18, 0, width * 0.82, height * 0.18, width * 0.48);
+  cornerGlow.addColorStop(0, "rgba(255, 80, 230, 0.085)");
+  cornerGlow.addColorStop(0.42, "rgba(74, 109, 255, 0.04)");
+  cornerGlow.addColorStop(1, "rgba(255, 80, 230, 0)");
+  ctx.fillStyle = cornerGlow;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.restore();
 }
 
 function drawActiveScanBeam(now) {
