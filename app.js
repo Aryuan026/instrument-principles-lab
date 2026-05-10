@@ -474,13 +474,13 @@ function analyzeUploadedLook(imageData, width, height) {
       if (r > 0.46 && r > g * 1.14 && r > b * 1.24 && lum > 0.18 && lum < 0.92) {
         redOrange += 1;
       }
-      if (chroma > 0.18 && lum > 0.12 && lum < 0.94) {
+      if (chroma > 0.14 && lum > 0.1 && lum < 0.95) {
         saturatedLike += 1;
       }
-      if (chroma > 0.16 && lum > 0.14 && lum < 0.92 && edge < 0.12) {
+      if (chroma > 0.12 && lum > 0.12 && lum < 0.94 && edge < 0.16) {
         flatColorLike += 1;
       }
-      if (lum < 0.2 && edge > 0.2) {
+      if (lum < 0.26 && edge > 0.14) {
         inkLineLike += 1;
       }
     }
@@ -497,7 +497,10 @@ function analyzeUploadedLook(imageData, width, height) {
   const flatColorRatio = flatColorLike / Math.max(1, count);
   const inkLineRatio = inkLineLike / Math.max(1, count);
   const neonCandidate = skyRatio > 0.08 || (edgeRatio > 0.18 && neutralRatio > 0.32 && stainRatio < 0.18 && warmNaturalRatio < 0.24);
-  const cartoonCandidate = edgeRatio > 0.12 && flatColorRatio > 0.16 && saturatedRatio > 0.24 && stainRatio < 0.16 && (inkLineRatio > 0.018 || neutralRatio < 0.36);
+  const cartoonCandidate = stainRatio < 0.2 && (
+    (edgeRatio > 0.085 && flatColorRatio > 0.09 && saturatedRatio > 0.13 && neutralRatio < 0.58) ||
+    (edgeRatio > 0.07 && flatColorRatio > 0.07 && saturatedRatio > 0.1 && inkLineRatio > 0.026)
+  );
   const softCandidate = stainRatio < 0.2 && skyRatio < 0.08 && (
     skinRatio > 0.018 ||
     redOrangeRatio > 0.055 ||
@@ -1134,6 +1137,10 @@ function render() {
   const colorMix = state.mode === "merge" || state.mode === "pseudo" ? state.colorMix : 0;
   const neonLook = state.image && state.uploadLook === "neon";
   const softPhotoLook = state.image && state.uploadLook === "soft";
+  const activeChannelCount = Number(state.channels.blue) + Number(state.channels.green) + Number(state.channels.red) + Number(state.channels.magenta);
+  const softChannelPresence = activeChannelCount > 0 ? 0.34 + activeChannelCount * 0.16 : 0.02;
+  const softOffsetKeep = softPhotoLook ? Math.pow(clamp(1 - darken * 0.82, 0.05, 1), 1.25) : 1;
+  const softBaseGate = softPhotoLook ? softChannelPresence * softOffsetKeep : 1;
   const neonSegmentSize = neonLook ? Math.max(74, Math.min(150, Math.round(Math.min(width, height) * 0.14))) : 1;
   const neonStrandSize = neonLook ? Math.max(28, Math.round(neonSegmentSize * 0.36)) : 1;
 
@@ -1252,7 +1259,7 @@ function render() {
         ? neonLook
           ? lineHalo * 5.5 + lum * (1.35 - darken * 1.18)
           : softPhotoLook
-            ? softMass * (24 - darken * 8) + lum * (11 - darken * 6) + lineHalo * 2.4
+            ? (softMass * (24 - darken * 8) + lum * (11 - darken * 6) + lineHalo * 2.4) * softBaseGate
             : lum * (4.6 - darken * 3.4) + lineHalo * 5
         : lum * (78 - darken * 58);
       let neonBlueWeight = 0.42;
@@ -1319,7 +1326,7 @@ function render() {
       const softChannelSignal = (value, gamma = 0.92, offsetFloor = uploadedOffsetFloor) => {
         const shaped = Math.pow(clamp(value, 0, 1), gamma);
         const thresholdGate = smoothstep(Math.max(0.018, threshold * 0.2), 1, shaped);
-        const offsetGate = smoothstep(Math.max(0.01, offsetFloor * 0.22), 1, shaped);
+        const offsetGate = smoothstep(Math.max(0.018, offsetFloor * 1.1), 1, shaped);
         return Math.pow(thresholdGate * offsetGate, 0.66) * intensity;
       };
 
