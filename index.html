@@ -138,7 +138,7 @@
                 <small>门槛像一道筛子：背景和弱噪声留在黑场，足够亮的信号才被看见</small>
               </span>
               <output id="thresholdValue">30</output>
-              <input id="thresholdSlider" type="range" min="0" max="92" value="30" />
+              <input id="thresholdSlider" type="range" min="0" max="100" value="30" />
             </label>
 
             <label class="range-control">
@@ -147,7 +147,7 @@
                 <small>探测器把少量光子放大成电信号；增益越高，弱信号越容易被放大成亮点</small>
               </span>
               <output id="intensityValue">125%</output>
-              <input id="intensitySlider" type="range" min="40" max="320" value="125" />
+              <input id="intensitySlider" type="range" min="0" max="400" value="125" />
             </label>
 
             <label class="range-control">
@@ -156,7 +156,7 @@
                 <small>显微镜看见的点不是数学上的点，而是一个小光斑；光斑越宽，细节越容易糊开</small>
               </span>
               <output id="glowValue">18</output>
-              <input id="glowSlider" type="range" min="0" max="38" value="18" />
+              <input id="glowSlider" type="range" min="0" max="40" value="18" />
             </label>
 
             <label class="range-control">
@@ -165,7 +165,7 @@
                 <small>真实图像总有暗背景；扣除过少会雾蒙蒙，扣除过多会把微弱结构一起吃掉</small>
               </span>
               <output id="backgroundValue">58%</output>
-              <input id="backgroundSlider" type="range" min="0" max="90" value="58" />
+              <input id="backgroundSlider" type="range" min="0" max="100" value="58" />
             </label>
           </div>
 
