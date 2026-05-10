@@ -1243,6 +1243,8 @@ function render() {
       const uploadedHighlight = state.image
         ? clamp(uploadedHot * (0.34 + uploadedFine * 0.42 + sparkle * 0.12), 0, 1.38)
         : high;
+      const softDarkDetail = softPhotoLook ? clamp(uploadedDarkRim * 0.64 + lineCore * (1 - uploadedMid) * 0.38 + coolChroma * colorEdge * 0.18, 0, 1) : 0;
+      const softMidDetail = softPhotoLook ? clamp(softMass * smoothstep(0.22, 0.72, lum) * (1 - smoothstep(0.72, 1, lum)) * 0.76 + uploadedTexture * uploadedMid * 0.18 + greenChroma * 0.2, 0, 1) : 0;
       const neonStructure = neonLook ? smoothstep(0.16, 0.62, edgeSignal) : 1;
       const uploadedLine = state.image
         ? neonLook
@@ -1251,6 +1253,7 @@ function render() {
             ? clamp(softContour * 0.5 + softMass * 0.22, 0, 0.9)
             : clamp(uploadedTexture * 0.58 + lineCore * 0.28 + uploadedHighlight * 0.08, 0, 1.2)
         : edge;
+      const softBrightDetail = softPhotoLook ? clamp(uploadedHighlight * 0.22 + uploadedLine * smoothstep(0.5, 0.95, lum) * 0.2 + chroma * uploadedTexture * 0.12, 0, 1) : 0;
       const uploadedShadowEdge = state.image
         ? clamp(uploadedDarkRim * (0.28 + coolChroma * 0.28) * (1 - warmChroma * 0.62) * (1 - skyWash * 0.72), 0, 1)
         : uploadedDarkRim;
@@ -1355,7 +1358,7 @@ function render() {
             ? neonLook
               ? uploadedLine * (0.08 + neonBlueWeight * 0.76) + uploadedShadowEdge * 0.03 + coolChroma * colorEdge * 0.1
               : softPhotoLook
-                ? softMass * 0.42 + uploadedLine * 0.28 + uploadedShadowEdge * 0.035
+                ? softDarkDetail * 0.46 + uploadedLine * (1 - uploadedMid) * 0.24 + coolChroma * colorEdge * 0.12 + softMass * 0.1
                 : uploadedLine * 0.22 + uploadedShadowEdge * 0.32 + uploadedBright * 0.05
             : Math.pow(srcB, 1.08);
           const signal = clamp((softPhotoLook ? softChannelSignal(blueInput, 0.92, uploadedOffsetFloor) : channelSignal(blueInput, 1, uploadedOffsetFloor)) * reveal * colorMix, 0, state.image ? (neonLook ? 1.4 : softPhotoLook ? 0.95 : 0.92) : 1.2);
@@ -1371,7 +1374,7 @@ function render() {
             ? neonLook
               ? uploadedLine * (0.1 + neonGreenWeight * 0.82) + greenChroma * colorEdge * 0.16
               : softPhotoLook
-                ? softMass * 0.34 + uploadedLine * 0.22 + greenChroma * 0.12
+                ? softMidDetail * 0.48 + uploadedTexture * uploadedMid * 0.16 + greenChroma * 0.18 + softMass * 0.08
                 : uploadedLine * 0.28 + greenChroma * 0.4 + uploadedMid * 0.06
             : Math.pow(srcG, 1.02);
           const signal = clamp((softPhotoLook ? softChannelSignal(greenInput, 0.96, uploadedOffsetFloor) : channelSignal(greenInput, 1, uploadedOffsetFloor)) * reveal * colorMix, 0, state.image ? (neonLook ? 1.6 : softPhotoLook ? 0.82 : 1.02) : 1.28);
@@ -1387,7 +1390,7 @@ function render() {
             ? neonLook
               ? uploadedLine * (0.025 + neonRedWeight * 0.78) + uploadedHighlight * 0.018 + warmChroma * colorEdge * 0.16
               : softPhotoLook
-                ? softMass * 0.15 + uploadedLine * 0.13 + uploadedHighlight * 0.075 + warmChroma * colorEdge * 0.26
+                ? uploadedLine * 0.17 + uploadedHighlight * 0.08 + warmChroma * colorEdge * 0.28 + softBrightDetail * warmChroma * 0.12
                 : uploadedLine * 0.16 + uploadedHighlight * 0.24 + warmChroma * 0.5
             : Math.pow(srcR, 1.04);
           const signal = clamp((softPhotoLook ? softChannelSignal(redInput, 0.9, uploadedOffsetFloor) : channelSignal(redInput, 0.98, uploadedOffsetFloor)) * reveal * colorMix, 0, state.image ? (neonLook ? 0.56 : softPhotoLook ? 0.72 : 1.18) : 1.28);
@@ -1403,7 +1406,7 @@ function render() {
             ? neonLook
               ? uploadedLine * (0.025 + neonMagentaWeight * 0.72) + uploadedHighlight * warmChroma * 0.035 + warmChroma * colorEdge * 0.18 + chroma * colorEdge * 0.035
               : softPhotoLook
-                ? softMass * 0.3 + uploadedLine * 0.24 + chroma * uploadedTexture * 0.025
+                ? softBrightDetail * 0.46 + uploadedLine * smoothstep(0.42, 0.9, lum) * 0.14 + chroma * uploadedTexture * 0.08 + softMass * 0.06
                 : uploadedLine * 0.2 + uploadedHighlight * 0.16 + warmChroma * 0.3 + chroma * uploadedTexture * 0.06
             : Math.max(srcR * 0.55, srcB * 0.38);
           const signal = clamp((softPhotoLook ? softChannelSignal(magentaInput, 0.94, uploadedOffsetFloor) : channelSignal(magentaInput, 1, uploadedOffsetFloor)) * reveal * colorMix, 0, state.image ? (neonLook ? 0.62 : softPhotoLook ? 0.88 : 1.02) : 1.2);
@@ -1437,8 +1440,8 @@ function render() {
           const meanSignal = activeSignalTotal / Math.max(1, activeSignalCount);
           const warmSignal = softRedSignal + softMagentaSignal * 0.34;
           const coolSignal = softBlueSignal + softGreenSignal * 0.58;
-          const overlapSignal = clamp(Math.min(warmSignal, coolSignal) * 0.62 + meanSignal * 0.18, 0, 0.74);
-          const whiteLift = overlapSignal * (44 + softMass * 28);
+          const overlapSignal = clamp(Math.min(warmSignal, coolSignal) * 0.48 + meanSignal * 0.08, 0, 0.58);
+          const whiteLift = overlapSignal * (34 + softMass * 20);
           r += whiteLift * 1.06 + softRedSignal * 34;
           g += whiteLift * 0.98 + softRedSignal * 10;
           b += whiteLift * 0.9;
