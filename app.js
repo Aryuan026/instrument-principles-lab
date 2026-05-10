@@ -57,10 +57,10 @@ const neonChannelColors = {
 };
 
 const softPhotoChannelColors = {
-  blue: [106, 152, 255],
-  green: [78, 218, 196],
-  red: [255, 190, 108],
-  magenta: [196, 148, 255],
+  blue: [126, 160, 255],
+  green: [88, 224, 204],
+  red: [255, 176, 92],
+  magenta: [210, 150, 255],
 };
 
 const state = {
@@ -215,7 +215,7 @@ function applyUploadLook(look) {
     if (look === "neon") {
       state.channels = { blue: true, green: true, red: true, magenta: true };
     } else if (look === "soft") {
-      state.channels = { blue: true, green: true, red: false, magenta: true };
+      state.channels = { blue: true, green: true, red: true, magenta: true };
     } else {
       state.channels = { blue: true, green: true, red: true, magenta: false };
     }
@@ -435,6 +435,9 @@ function analyzeUploadedLook(imageData, width, height) {
   let skinLike = 0;
   let warmNatural = 0;
   let redOrange = 0;
+  let saturatedLike = 0;
+  let flatColorLike = 0;
+  let inkLineLike = 0;
 
   for (let y = 0; y < height - step; y += step) {
     for (let x = 0; x < width - step; x += step) {
@@ -471,6 +474,15 @@ function analyzeUploadedLook(imageData, width, height) {
       if (r > 0.46 && r > g * 1.14 && r > b * 1.24 && lum > 0.18 && lum < 0.92) {
         redOrange += 1;
       }
+      if (chroma > 0.18 && lum > 0.12 && lum < 0.94) {
+        saturatedLike += 1;
+      }
+      if (chroma > 0.16 && lum > 0.14 && lum < 0.92 && edge < 0.12) {
+        flatColorLike += 1;
+      }
+      if (lum < 0.2 && edge > 0.2) {
+        inkLineLike += 1;
+      }
     }
   }
 
@@ -481,7 +493,11 @@ function analyzeUploadedLook(imageData, width, height) {
   const skinRatio = skinLike / Math.max(1, count);
   const warmNaturalRatio = warmNatural / Math.max(1, count);
   const redOrangeRatio = redOrange / Math.max(1, count);
+  const saturatedRatio = saturatedLike / Math.max(1, count);
+  const flatColorRatio = flatColorLike / Math.max(1, count);
+  const inkLineRatio = inkLineLike / Math.max(1, count);
   const neonCandidate = skyRatio > 0.08 || (edgeRatio > 0.18 && neutralRatio > 0.32 && stainRatio < 0.18 && warmNaturalRatio < 0.24);
+  const cartoonCandidate = edgeRatio > 0.12 && flatColorRatio > 0.16 && saturatedRatio > 0.24 && stainRatio < 0.16 && (inkLineRatio > 0.018 || neutralRatio < 0.36);
   const softCandidate = stainRatio < 0.2 && skyRatio < 0.08 && (
     skinRatio > 0.018 ||
     redOrangeRatio > 0.055 ||
@@ -489,6 +505,9 @@ function analyzeUploadedLook(imageData, width, height) {
     (neutralRatio < 0.28 && edgeRatio < 0.24)
   );
 
+  if (cartoonCandidate) {
+    return "neon";
+  }
   if (neonCandidate && !(softCandidate && skyRatio < 0.08)) {
     return "neon";
   }
@@ -1282,9 +1301,13 @@ function render() {
         neonRedWeight = clamp((neonRedWeight + warmChroma * 0.14) * strengthJitter, 0, 0.86);
         neonMagentaWeight = clamp((neonMagentaWeight + warmChroma * 0.1 + chroma * 0.025) * strengthJitter, 0, 1.08);
       }
-      let r = softPhotoLook ? baseLevel * 0.78 : baseLevel;
-      let g = softPhotoLook ? baseLevel * 0.9 : baseLevel;
-      let b = softPhotoLook ? baseLevel * 1.08 : baseLevel;
+      let r = softPhotoLook ? baseLevel * 0.94 : baseLevel;
+      let g = softPhotoLook ? baseLevel * 0.98 : baseLevel;
+      let b = softPhotoLook ? baseLevel * 1.02 : baseLevel;
+      let softBlueSignal = 0;
+      let softGreenSignal = 0;
+      let softRedSignal = 0;
+      let softMagentaSignal = 0;
 
       const channelSignal = (value, gamma = 1, offsetFloor = blackFloor) => {
         const shaped = Math.pow(clamp(value, 0, 1), gamma);
@@ -1329,6 +1352,9 @@ function render() {
                 : uploadedLine * 0.22 + uploadedShadowEdge * 0.32 + uploadedBright * 0.05
             : Math.pow(srcB, 1.08);
           const signal = clamp((softPhotoLook ? softChannelSignal(blueInput, 0.92, uploadedOffsetFloor) : channelSignal(blueInput, 1, uploadedOffsetFloor)) * reveal * colorMix, 0, state.image ? (neonLook ? 1.4 : softPhotoLook ? 0.95 : 0.92) : 1.2);
+          if (softPhotoLook) {
+            softBlueSignal = signal;
+          }
           r += activeChannelColors.blue[0] * signal;
           g += activeChannelColors.blue[1] * signal;
           b += activeChannelColors.blue[2] * signal;
@@ -1342,6 +1368,9 @@ function render() {
                 : uploadedLine * 0.28 + greenChroma * 0.4 + uploadedMid * 0.06
             : Math.pow(srcG, 1.02);
           const signal = clamp((softPhotoLook ? softChannelSignal(greenInput, 0.96, uploadedOffsetFloor) : channelSignal(greenInput, 1, uploadedOffsetFloor)) * reveal * colorMix, 0, state.image ? (neonLook ? 1.6 : softPhotoLook ? 0.82 : 1.02) : 1.28);
+          if (softPhotoLook) {
+            softGreenSignal = signal;
+          }
           r += activeChannelColors.green[0] * signal;
           g += activeChannelColors.green[1] * signal;
           b += activeChannelColors.green[2] * signal;
@@ -1351,10 +1380,13 @@ function render() {
             ? neonLook
               ? uploadedLine * (0.025 + neonRedWeight * 0.78) + uploadedHighlight * 0.018 + warmChroma * colorEdge * 0.16
               : softPhotoLook
-                ? softMass * 0.09 + uploadedLine * 0.075 + uploadedHighlight * 0.055 + warmChroma * colorEdge * 0.18
+                ? softMass * 0.15 + uploadedLine * 0.13 + uploadedHighlight * 0.075 + warmChroma * colorEdge * 0.26
                 : uploadedLine * 0.16 + uploadedHighlight * 0.24 + warmChroma * 0.5
             : Math.pow(srcR, 1.04);
-          const signal = clamp((softPhotoLook ? softChannelSignal(redInput, 0.98, uploadedOffsetFloor) : channelSignal(redInput, 0.98, uploadedOffsetFloor)) * reveal * colorMix, 0, state.image ? (neonLook ? 0.56 : softPhotoLook ? 0.5 : 1.18) : 1.28);
+          const signal = clamp((softPhotoLook ? softChannelSignal(redInput, 0.9, uploadedOffsetFloor) : channelSignal(redInput, 0.98, uploadedOffsetFloor)) * reveal * colorMix, 0, state.image ? (neonLook ? 0.56 : softPhotoLook ? 0.72 : 1.18) : 1.28);
+          if (softPhotoLook) {
+            softRedSignal = signal;
+          }
           r += activeChannelColors.red[0] * signal;
           g += activeChannelColors.red[1] * signal;
           b += activeChannelColors.red[2] * signal;
@@ -1368,9 +1400,41 @@ function render() {
                 : uploadedLine * 0.2 + uploadedHighlight * 0.16 + warmChroma * 0.3 + chroma * uploadedTexture * 0.06
             : Math.max(srcR * 0.55, srcB * 0.38);
           const signal = clamp((softPhotoLook ? softChannelSignal(magentaInput, 0.94, uploadedOffsetFloor) : channelSignal(magentaInput, 1, uploadedOffsetFloor)) * reveal * colorMix, 0, state.image ? (neonLook ? 0.62 : softPhotoLook ? 0.88 : 1.02) : 1.2);
+          if (softPhotoLook) {
+            softMagentaSignal = signal;
+          }
           r += activeChannelColors.magenta[0] * signal;
           g += activeChannelColors.magenta[1] * signal;
           b += activeChannelColors.magenta[2] * signal;
+        }
+
+        if (softPhotoLook) {
+          let activeSignalTotal = 0;
+          let activeSignalCount = 0;
+          if (softBlueSignal > 0) {
+            activeSignalTotal += softBlueSignal;
+            activeSignalCount += 1;
+          }
+          if (softGreenSignal > 0) {
+            activeSignalTotal += softGreenSignal;
+            activeSignalCount += 1;
+          }
+          if (softRedSignal > 0) {
+            activeSignalTotal += softRedSignal;
+            activeSignalCount += 1;
+          }
+          if (softMagentaSignal > 0) {
+            activeSignalTotal += softMagentaSignal;
+            activeSignalCount += 1;
+          }
+          const meanSignal = activeSignalTotal / Math.max(1, activeSignalCount);
+          const warmSignal = softRedSignal + softMagentaSignal * 0.34;
+          const coolSignal = softBlueSignal + softGreenSignal * 0.58;
+          const overlapSignal = clamp(Math.min(warmSignal, coolSignal) * 0.62 + meanSignal * 0.18, 0, 0.74);
+          const whiteLift = overlapSignal * (44 + softMass * 28);
+          r += whiteLift * 1.06 + softRedSignal * 34;
+          g += whiteLift * 0.98 + softRedSignal * 10;
+          b += whiteLift * 0.9;
         }
       }
 
