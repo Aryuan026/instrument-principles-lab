@@ -173,6 +173,28 @@ input[type="range"]:focus-visible {
   outline-offset: 3px;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .upload-target,
+  .sample-button,
+  .cache-button,
+  .flow-button,
+  .mode-button,
+  .channel-button,
+  .action-button {
+    transition-duration: 1ms;
+  }
+
+  .upload-target:active,
+  .sample-button:active,
+  .cache-button:active,
+  .flow-button:active,
+  .mode-button:active,
+  .channel-button:active,
+  .action-button:active {
+    transform: none;
+  }
+}
+
 .upload-target {
   display: grid;
   grid-template-columns: 46px 1fr;
@@ -398,6 +420,22 @@ input[type="range"]:focus-visible {
   background:
     linear-gradient(180deg, rgba(24, 33, 31, 0.94), rgba(8, 11, 11, 0.96)),
     var(--panel-strong);
+}
+
+@media (min-width: 981px) {
+  .lab-grid {
+    align-items: stretch;
+  }
+
+  .sample-panel,
+  .scope-panel,
+  .control-panel {
+    height: 100%;
+  }
+
+  .scope-panel {
+    align-self: stretch;
+  }
 }
 
 .scope-toolbar {

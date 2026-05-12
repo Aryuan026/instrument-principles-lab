@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>共聚焦原理互动展示｜荧光信号显影台</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=2026-05-12" />
   </head>
   <body>
     <div class="app-shell">
@@ -27,28 +27,28 @@
           </div>
 
           <div class="sample-list" aria-label="示例样本">
-            <button class="sample-button is-active" type="button" data-sample="city">
+            <button class="sample-button is-active" type="button" data-sample="city" aria-pressed="true">
               <span class="sample-thumb thumb-city" aria-hidden="true"></span>
               <span>
                 <strong>城市灯光</strong>
                 <small>默认主图，亮点像最直观的信号</small>
               </span>
             </button>
-            <button class="sample-button" type="button" data-sample="cells">
+            <button class="sample-button" type="button" data-sample="cells" aria-pressed="false">
               <span class="sample-thumb thumb-cells" aria-hidden="true"></span>
               <span>
                 <strong>细胞结构</strong>
                 <small>DAPI 标记细胞核，绿色骨架，红色颗粒</small>
               </span>
             </button>
-            <button class="sample-button" type="button" data-sample="chloroplast">
+            <button class="sample-button" type="button" data-sample="chloroplast" aria-pressed="false">
               <span class="sample-thumb thumb-chloroplast" aria-hidden="true"></span>
               <span>
                 <strong>叶片叶脉</strong>
                 <small>叶脉背景，绿色叶绿体，红色自发荧光</small>
               </span>
             </button>
-            <button class="sample-button" type="button" data-sample="fibers">
+            <button class="sample-button" type="button" data-sample="fibers" aria-pressed="false">
               <span class="sample-thumb thumb-fibers" aria-hidden="true"></span>
               <span>
                 <strong>神经网络</strong>
@@ -102,15 +102,15 @@
             <div class="corner-label bottom-right" aria-hidden="true">20 um</div>
             <div class="scale-bar" aria-hidden="true"></div>
             <div class="scope-guide" aria-label="成像流程">
-              <button class="flow-button" type="button" data-flow="acquire">
+              <button class="flow-button" type="button" data-flow="acquire" aria-pressed="false">
                 <strong>模拟采集</strong>
                 <span>拖拽采集局部信号</span>
               </button>
-              <button class="flow-button" type="button" data-flow="raster">
+              <button class="flow-button" type="button" data-flow="raster" aria-pressed="false">
                 <strong>点扫描</strong>
                 <span>单点逐行读完整图</span>
               </button>
-              <button class="flow-button" type="button" data-flow="color">
+              <button class="flow-button" type="button" data-flow="color" aria-pressed="false">
                 <strong>伪彩叠加</strong>
                 <span>灰度翻译成通道颜色</span>
               </button>
@@ -118,10 +118,10 @@
           </div>
 
           <div class="mode-strip" role="tablist" aria-label="观察阶段">
-            <button class="mode-button is-active" type="button" role="tab" data-mode="brightfield">明场找焦</button>
-            <button class="mode-button" type="button" role="tab" data-mode="gray">灰度信号</button>
-            <button class="mode-button" type="button" role="tab" data-mode="pseudo">伪彩显影</button>
-            <button class="mode-button" type="button" role="tab" data-mode="merge">多通道合成</button>
+            <button class="mode-button is-active" type="button" role="tab" data-mode="brightfield" aria-selected="true">明场找焦</button>
+            <button class="mode-button" type="button" role="tab" data-mode="gray" aria-selected="false">灰度信号</button>
+            <button class="mode-button" type="button" role="tab" data-mode="pseudo" aria-selected="false">伪彩显影</button>
+            <button class="mode-button" type="button" role="tab" data-mode="merge" aria-selected="false">多通道合成</button>
           </div>
         </section>
 
@@ -173,28 +173,28 @@
             <p class="section-label">荧光通道</p>
             <p class="channel-note">激发光先照进样本，探测器只收发射光：比如 FITC 常用蓝光入射，看到绿色信号。</p>
             <div class="channel-grid">
-              <button class="channel-button is-on channel-blue" type="button" data-channel="blue">
+              <button class="channel-button is-on channel-blue" type="button" data-channel="blue" aria-pressed="true">
                 <span class="channel-dot" aria-hidden="true"></span>
                 <span class="channel-copy">
                   <strong>DAPI</strong>
                   <small>紫外/紫光入射 -> 蓝色发射</small>
                 </span>
               </button>
-              <button class="channel-button is-on channel-green" type="button" data-channel="green">
+              <button class="channel-button is-on channel-green" type="button" data-channel="green" aria-pressed="true">
                 <span class="channel-dot" aria-hidden="true"></span>
                 <span class="channel-copy">
                   <strong>FITC</strong>
                   <small>蓝光入射 -> 绿色发射</small>
                 </span>
               </button>
-              <button class="channel-button is-on channel-red" type="button" data-channel="red">
+              <button class="channel-button is-on channel-red" type="button" data-channel="red" aria-pressed="true">
                 <span class="channel-dot" aria-hidden="true"></span>
                 <span class="channel-copy">
                   <strong>TRITC</strong>
                   <small>绿光入射 -> 红橙发射</small>
                 </span>
               </button>
-              <button class="channel-button channel-magenta" type="button" data-channel="magenta">
+              <button class="channel-button channel-magenta" type="button" data-channel="magenta" aria-pressed="false">
                 <span class="channel-dot" aria-hidden="true"></span>
                 <span class="channel-copy">
                   <strong>Cy5</strong>
@@ -208,6 +208,6 @@
 
     </div>
 
-    <script src="./app.js"></script>
+    <script src="./app.js?v=2026-05-12"></script>
   </body>
 </html>

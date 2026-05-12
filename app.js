@@ -151,7 +151,9 @@ function setActiveSample(sample) {
   state.channelsTouched = false;
   state.activeUploadId = null;
   document.querySelectorAll(".sample-button").forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.sample === sample);
+    const active = button.dataset.sample === sample;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
   });
   renderUploadCache();
   drawSource();
@@ -187,7 +189,10 @@ function setUploadedImage(src, name, cacheId = null) {
     state.uploadLook = "pending";
     state.channelsTouched = false;
     state.activeUploadId = cacheId || addUploadCache(src, name);
-    document.querySelectorAll(".sample-button").forEach((button) => button.classList.remove("is-active"));
+    document.querySelectorAll(".sample-button").forEach((button) => {
+      button.classList.remove("is-active");
+      button.setAttribute("aria-pressed", "false");
+    });
     syncChannelButtons();
     renderUploadCache();
     drawSource();
@@ -199,7 +204,9 @@ function setUploadedImage(src, name, cacheId = null) {
 function syncChannelButtons() {
   document.querySelectorAll(".channel-button").forEach((button) => {
     const channel = button.dataset.channel;
-    button.classList.toggle("is-on", Boolean(state.channels[channel]));
+    const active = Boolean(state.channels[channel]);
+    button.classList.toggle("is-on", active);
+    button.setAttribute("aria-pressed", String(active));
   });
 }
 
@@ -896,7 +903,9 @@ function resetMask(withSeed) {
 function setActiveFlow(flow) {
   state.flow = flow;
   flowButtons.forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.flow === flow);
+    const active = button.dataset.flow === flow;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
   });
   updateReadouts();
 }
